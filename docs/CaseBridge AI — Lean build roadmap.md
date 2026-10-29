@@ -25,7 +25,7 @@ I have not seen your earlier code, so these are the usual causes. Share the repo
 | Dashboard counts computed live over every case | Keep a small summary table updated by the app or a job; tiles read one row |
 | Page waits for data before showing anything | Render the layout and skeleton instantly; fill data when it arrives |
 | One huge JavaScript bundle (charts, OCR, AI libraries) | Lazy-load heavy libraries per route; the landing page ships almost no JavaScript |
-| Running the dev server or an unoptimised build | Test the production build (`next build`) on the deployed URL |
+| Running the dev server or an unoptimised build | Test the production build (`npm run build` / `vite build` + `vite preview`) on the deployed URL |
 | AI or email work inside the request | Queue it; the click returns at once and the result arrives later |
 
 **Speed budget to test against:** button reacts in under 100 ms, list API under 300 ms, page ready in under 2 s on a mid-range phone with throttled 4G. Check with Chrome Lighthouse and the Network tab at the end of every stage.
@@ -34,14 +34,46 @@ I have not seen your earlier code, so these are the usual causes. Share the repo
 
 ## Build order
 
-Days are rough for a small team working in parallel; stretch or squeeze them to your SIH deadline. Stack for all stages: Next.js + TypeScript + Tailwind + shadcn/ui, PostgreSQL (Supabase or Neon), deployed early on Vercel.
+Days are rough for a small team working in parallel; stretch or squeeze them to your SIH deadline. 
+
+**Standard Stack for all stages:**
+- **Frontend Core:** **React + Vite** (Pure Single Page Application)
+- **Language:** **JavaScript (`.js` / `.jsx`) ONLY** (Strictly no Next.js, no TypeScript, and no other meta-frameworks)
+- **Routing:** `react-router-dom` for client-side routing across all four portals (`/`, `/student/*`, `/faculty/*`, `/college/*`, `/aicte/*`)
+- **Styling & UI:** Tailwind CSS + `lucide-react` for icons + custom modular JSX components
+- **State & Data Fetching:** TanStack Query (`@tanstack/react-query`) or custom React hooks with Axios/Fetch
+- **Backend & Database:** PostgreSQL via Supabase (`@supabase/supabase-js`) or lightweight Node/Express REST API
+- **Deployment:** Vercel / Netlify / Cloudflare Pages (serving optimized static `dist/` build)
+
+> **Key Rule:** Zero Next.js, zero TypeScript, zero meta-frameworks. Keep build times instantaneous with Vite and write clean, idiomatic ES6+ JavaScript (`.js` / `.jsx`).
+
+### React + Vite JavaScript Architecture
+```text
+src/
+├── assets/             # SVGs, brand assets, AICTE logos
+├── components/         # Shared UI primitives (DataTable.jsx, StatusChip.jsx, KPITile.jsx, Timeline.jsx, Modal.jsx)
+├── context/            # AuthContext.jsx (role/session state), NotificationContext.jsx
+├── data/               # Local mock JSON data (institutions.json, cases.json, overlaps.json)
+├── hooks/              # Custom React hooks (useCases.js, useDebounce.js, useInstitutions.js)
+├── layouts/            # AppShell.jsx (responsive sidebar/bottom-bar), Header.jsx
+├── portals/            # Four portal views
+│   ├── public/         # LandingPage.jsx, LoginPage.jsx, RegisterPage.jsx
+│   ├── student/        # StudentDashboard.jsx, ComplaintWizard.jsx, CaseDetail.jsx
+│   ├── faculty/        # FacultyInbox.jsx, FacultyCaseReview.jsx
+│   ├── college/        # CollegeDashboard.jsx, AssignMemberModal.jsx, CommitteeList.jsx
+│   └── aicte/          # AicteDashboard.jsx, OverlapAlerts.jsx, InstitutionProfile.jsx, Reports.jsx
+├── services/           # mockApi.js (Stage 1), api.js / supabaseClient.js (Stage 2+)
+├── App.jsx             # React Router (BrowserRouter, Routes, ProtectedRoute)
+├── main.jsx            # Vite React entry point
+└── index.css           # Tailwind CSS styles
+```
 
 | Stage | What you build | Days | Done when |
 | --- | --- | --- | --- |
-| 0. Setup and speed baseline | Repo, folders per portal, deploy a blank app, ESLint, Lighthouse check, seed-data plan | 1 | The deployed blank app scores 90+ on Lighthouse performance |
+| 0. Setup and speed baseline | Vite React (JS) project setup (`npm create vite@latest . -- --template react`), Tailwind CSS, React Router, folders per portal, deploy blank SPA, ESLint, Lighthouse check, seed-data plan | 1 | The deployed blank app scores 90+ on Lighthouse performance |
 | 1. Clickable prototype with fake data | Landing page, login and sign-up (fake sessions with a role picker), four portal shells, dashboards, case tables with pagination, case detail with timeline, responsive layouts | 4 | You can demo all four portals on a phone and a laptop; every click reacts in under 100 ms |
 | 2. Real database and fast lists | Schema for institutions, users, complaints, case events; seed 300 institutions and 3,000 cases; list API with filters, pagination and search; indexes; dashboard summary table | 3 | List API under 300 ms with 3,000 cases, and still under 300 ms when you test with 50,000 |
-| 3. Authentication and roles | Real sign-up and login (Supabase Auth or Auth.js), email OTP, roles, route guards, API permission checks, institution isolation | 3 | A college account cannot read another college's cases through the UI or by editing the API request |
+| 3. Authentication and roles | Real sign-up and login (Supabase Auth JS SDK or custom JWT context), email OTP, roles, React Router route guards, API permission checks, institution isolation | 3 | A college account cannot read another college's cases through the UI or by editing the API request |
 | 4. Core case lifecycle | Complaint submission wizard, status changes, assignment, transfer, response, history timeline, student tracking, in-app notifications | 4 | One case travels from student submission to a recorded decision across all four portals |
 | 5. Overlap alerts | Alert 1 (coordination) as a database query; Alert 2 (related cases) with name matching and background-computed embeddings; explanation panel; link and dismiss | 4 | Seeded overlaps are found, unrelated pairs are not, and a labelled test set reports precision and recall |
 | 6. Verification, email, deadlines | Roster CSV upload, affiliation match and review queue, email notifications through a queue, deadline job with reminders | 3 | A wrong or unclaimed enrollment goes to review, and reminders reach the right person only |
@@ -64,7 +96,7 @@ Fake data lives in local JSON behind a small mock API with the same URLs and res
 
 **Shared building blocks to make first:** app shell with sidebar that becomes a bottom bar on phones, data table with server-style pagination, status chip, KPI tile, timeline, empty and loading states, toast messages. Building these once keeps the portals consistent and the code small.
 
-**Fake login for now:** pick a role, get a cookie, land on that portal. Real authentication is Stage 3, so the prototype can be shown immediately.
+**Fake login for now:** pick a role, save active session in `localStorage` / React Context, land on that portal. Real authentication is Stage 3, so the prototype can be shown immediately.
 
 ## Pagination and search spec
 
